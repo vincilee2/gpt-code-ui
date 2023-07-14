@@ -28,11 +28,18 @@ UPLOAD_FOLDER = 'workspace/'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
+logging.basicConfig(level=logging.INFO)
+log_format = "%(asctime)s [%(levelname)s]: %(message)s"
+webapp_logger = logging.getLogger()
+file_handler = logging.FileHandler('app.log')
+file_handler.setFormatter(logging.Formatter(log_format))
+webapp_logger.addHandler(file_handler)
+webapp_logger.info('Starting webapp')
+
 APP_PORT = int(os.environ.get("WEB_PORT", 8080))
 
-
 class LimitedLengthString:
-    def __init__(self, maxlen=2000):
+    def __init__(self, maxlen=4000):
         self.data = deque()
         self.len = 0
         self.maxlen = maxlen
@@ -86,6 +93,7 @@ async def get_code(user_prompt, user_openai_key=None, model="gpt-3.5-turbo"):
         If the user has just uploaded a file, focus on the file that was most recently uploaded (and optionally all previously uploaded files)
     
     Teacher mode: if the code modifies or produces a file, end your output AFTER YOUR CODE BLOCK with a link to it as <a href='/download?file=INSERT_FILENAME_HERE'>Download file</a>. Replace INSERT_FILENAME_HERE with the actual filename. So just print that HTML to stdout at the end, AFTER your code block."""
+    webapp_logger.info("Prompt: " + prompt)
     temperature = 0.7
     message_array = [
         {
@@ -151,8 +159,7 @@ async def get_code(user_prompt, user_openai_key=None, model="gpt-3.5-turbo"):
     return extract_code(response.json()["choices"][0]["message"]["content"]), 200
 
 # We know this Flask app is for local use. So we can disable the verbose Werkzeug logger
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+
 
 cli = sys.modules['flask.cli']
 cli.show_server_banner = lambda *x: None
@@ -246,10 +253,15 @@ def upload_file():
         return jsonify({'error': 'No selected file'}), 400
     if file and allowed_file(file.filename):
         file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
+        file_content = open(os.path.join(app.config['UPLOAD_FOLDER'], file.filename)).read()
+        # Append all messages to the message buffer for later use
+        message_to_append = f"```uploaded file\n filename: {file.filename}\ncontent in file:\n{file_content}\n```"
+        message_buffer.append(message_to_append + "\n\n")
+        webapp_logger.info(f"Uploaded file: {file.filename}")
         return jsonify({'message': 'File successfully uploaded'}), 200
     else:
         return jsonify({'error': 'File type not allowed'}), 400
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=APP_PORT, debug=True, use_reloader=False)
+    app.run(host="0.0.0.0", port=APP_PORT, debug=True, use_reloader=True)

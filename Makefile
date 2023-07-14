@@ -32,7 +32,7 @@ compile_frontend:
 
 bundle_pypi:
 	rm -rf dist build && \
-	python3 setup.py sdist bdist_wheel
+	python setup.py sdist bdist_wheel
 
 upload_pypi:
 	twine upload dist/*

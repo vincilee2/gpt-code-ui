@@ -1,0 +1,19 @@
+version: "3.8"
+services:
+  gpt-code-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.fast
+    image: gpt-code-ui:latest
+    environment:
+      OPENAI_API_KEY: xxxxx
+      OPENAI_API_TYPE: azure
+      OPENAI_BASE_URL: https://xxxxx.openai.azure.com
+      OPENAI_API_VERSION: 2023-03-15-preview
+      AZURE_OPENAI_DEPLOYMENT: gpt-35-turbo-16k
+      API_PORT: 5010
+      WEB_PORT: 8089
+      SNAKEMQ_PORT: 8765
+      APP_HOST: localhost
+    ports:
+      - "8089:8089"

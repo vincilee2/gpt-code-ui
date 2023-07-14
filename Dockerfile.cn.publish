@@ -1,0 +1,55 @@
+FROM python:3.10-slim-buster 
+
+# 使用阿里云的镜像加速
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list
+
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+
+RUN echo "[easy_install]" > ~/.pydistutils.cfg && \
+    echo "index-url = https://mirrors.aliyun.com/pypi/simple/" >> ~/.pydistutils.cfg
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update ; \
+    apt-get upgrade -y ; \
+    apt-get install -y wget make
+
+RUN pip install --upgrade pip wheel
+
+####### prepare NODE NVM SETUP
+ENV NVM_DIR /usr/local/nvm
+ENV NODE_VERSION lts/hydrogen
+
+RUN mkdir -p $NVM_DIR
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"] 
+
+# see https://github.com/nvm-sh/nvm
+RUN wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+
+# install node and npm LTS
+RUN source $NVM_DIR/nvm.sh \
+    && nvm install $NODE_VERSION \
+    && nvm use $NODE_VERSION
+#######  
+
+####### add node and npm to path so the commands are available
+ENV NODE_PATH $NVM_DIR/v$NODE_VERSION/lib/node_modules
+ENV PATH $NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
+#######
+
+COPY . /gpt-code-ui
+WORKDIR /gpt-code-ui
+
+# prereqs for gpt-code-ui
+
+RUN apt install -y rsync socat
+
+RUN source $NVM_DIR/nvm.sh && make build
+
+RUN python setup.py install
+RUN pip install "numpy>=1.24,<1.25" "dateparser>=1.1,<1.2" "pandas>=1.5,<1.6" "geopandas>=0.13,<0.14" "PyPDF2>=3.0,<3.1" "pdfminer>=20191125,<20191200" "pdfplumber>=0.9,<0.10" "matplotlib>=3.7,<3.8"
+
+EXPOSE 8080
+ENV APP_HOST=
+
+ENTRYPOINT gptcode
